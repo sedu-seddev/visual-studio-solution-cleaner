@@ -1,12 +1,14 @@
 ﻿namespace Seddev.VisualStudio.SolutionCleaner
 {
+    using Microsoft.VisualStudio;
+    using Microsoft.VisualStudio.RpcContracts.FileSystem;
     using Microsoft.VisualStudio.Shell;
     using Microsoft.VisualStudio.Shell.Interop;
     using System;
     using System.ComponentModel.Design;
     using System.Diagnostics;
     using System.IO;
-    using System.Text;
+    using System.Reflection;
     using Task = System.Threading.Tasks.Task;
 
     /// <summary>
@@ -89,42 +91,92 @@
         private void Execute(object sender, EventArgs e)
         {
             ThreadHelper.ThrowIfNotOnUIThread();
+            OutputWindowTextWriter outputWindowTextWriter = null;
 
             try
             {
-                var solutionDirectory = Directory.GetCurrentDirectory();
-                var projectPaths = Directory.GetFiles(solutionDirectory, "*.csproj", SearchOption.AllDirectories);
+                outputWindowTextWriter = GetOutputWindowTextWriter();
+                FullCleanSolution(outputWindowTextWriter);
+            }
+            catch (Exception ex)
+            {
+                outputWindowTextWriter?.WriteLine("FATAL> Error while cleaning the solution!");
+                outputWindowTextWriter?.WriteLine($"FATAL> {ex.Message}");
+                outputWindowTextWriter?.WriteLine($"FATAL> {ex.StackTrace}");
 
-                foreach (var projectPath in projectPaths)
+                outputWindowTextWriter?.Close();
+                outputWindowTextWriter?.Dispose();
+            }            
+        }
+
+        /// <summary>
+        /// Creates a build output window pane text writer. Caller has to dispose the writer.
+        /// </summary>
+        /// <returns>OutputWindowTextWriter of type VSConstants.GUID_BuildOutputWindowPane.</returns>
+        private static OutputWindowTextWriter GetOutputWindowTextWriter()
+        {
+            var outWindow = Package.GetGlobalService(typeof(SVsOutputWindow)) as IVsOutputWindow;
+            var windowPaneGuid = VSConstants.GUID_BuildOutputWindowPane;
+            outWindow.GetPane(ref windowPaneGuid, out var buildOutputPane);
+            buildOutputPane.Activate();
+            var outputWindowTextWriter = new OutputWindowTextWriter(buildOutputPane);
+
+            return outputWindowTextWriter;
+        }
+
+        private static void FullCleanSolution(OutputWindowTextWriter outputWindowTextWriter)
+        {
+            outputWindowTextWriter.WriteLine("Full clean started...");
+
+            var solutionDirectory = Directory.GetCurrentDirectory();
+            var projectPaths = Directory.GetFiles(solutionDirectory, "*.csproj", SearchOption.AllDirectories);
+            var projectCount = 0;
+            var successCount = 0;
+            var failedCount = 0;
+            string currentProjectName = null;
+
+            foreach (var projectPath in projectPaths)
+            {
+                try
                 {
-                    var fileInfo = new FileInfo(projectPath);
+                    projectCount++;
+                    var fileInfo = new System.IO.FileInfo(projectPath);
+                    currentProjectName = fileInfo.Name;
+                    outputWindowTextWriter.WriteLine($"{projectCount}> ------ Full clean started: Project: {currentProjectName} ------");
                     var binDirectory = Path.Combine(fileInfo.DirectoryName, "bin");
                     var objDirectory = Path.Combine(fileInfo.DirectoryName, "obj");
 
                     if (Directory.Exists(binDirectory))
                     {
                         Directory.Delete(binDirectory, true);
+                        outputWindowTextWriter.WriteLine($"{projectCount}> bin folder cleaned for project {currentProjectName}");
+                    }
+                    else
+                    {
+                        outputWindowTextWriter.WriteLine($"{projectCount}> No bin folder exists for project {currentProjectName}");
                     }
 
                     if (Directory.Exists(objDirectory))
                     {
                         Directory.Delete(objDirectory, true);
+                        outputWindowTextWriter.WriteLine($"{projectCount}> obj folder cleaned for project {currentProjectName}");
                     }
-                }
-            }
-            catch (Exception ex)
-            {
-                var message = $"Error while cleaning the bin and obj folders:{Environment.NewLine}{Environment.NewLine}{ex.Message}{Environment.NewLine}{ex.StackTrace}";
-                var title = "Error";
+                    else
+                    {
+                        outputWindowTextWriter.WriteLine($"{projectCount}> No obj folder exists for project {currentProjectName}");
+                    }
 
-                // Show a message box to prove we were here
-                VsShellUtilities.ShowMessageBox(
-                    this.package,
-                    message,
-                    title,
-                    OLEMSGICON.OLEMSGICON_CRITICAL,
-                    OLEMSGBUTTON.OLEMSGBUTTON_OK,
-                    OLEMSGDEFBUTTON.OLEMSGDEFBUTTON_FIRST);
+                    successCount++;
+                }
+                catch (Exception ex)
+                {
+                    failedCount++;
+                    outputWindowTextWriter.WriteLine($"ERROR: {projectCount}> Error while cleaning {currentProjectName}");
+                    outputWindowTextWriter.WriteLine($"ERROR: {projectCount}> {ex.Message}");
+                    outputWindowTextWriter.WriteLine($"ERROR: {projectCount}> {ex.StackTrace}");
+                }
+
+                outputWindowTextWriter.WriteLine($"========== Full clean: {successCount} succeeded, {failedCount} failed ==========");
             }
         }
     }

@@ -3,9 +3,10 @@
     <Metadata>
         <Identity Id="Seddev.VisualStudio.SolutionCleaner.19016c33-72d4-4486-b411-982dbd78be8c" Version="1.0" Language="en-US" Publisher="Seddev" />
         <DisplayName>Seddev Solution Cleaner</DisplayName>
-        <Description xml:space="preserve">Clean all "bin" and "obj" folders completly of all projects with one click.</Description>
+        <Description xml:space="preserve">Clean all "bin" and "obj" folders of all projects with one click.</Description>
         <MoreInfo>https://github.com/sedu-seddev/visual-studio-solution-cleaner</MoreInfo>
         <ReleaseNotes>Initial version.</ReleaseNotes>
+        <Preview>true</Preview>
     </Metadata>
     <Installation>
         <InstallationTarget Id="Microsoft.VisualStudio.Community" Version="[17.0, 18.0)">
