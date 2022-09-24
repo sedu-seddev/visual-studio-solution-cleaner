@@ -1,14 +1,13 @@
 ﻿namespace Seddev.VisualStudio.SolutionCleaner
 {
     using Microsoft.VisualStudio;
-    using Microsoft.VisualStudio.RpcContracts.FileSystem;
     using Microsoft.VisualStudio.Shell;
     using Microsoft.VisualStudio.Shell.Interop;
+    using Seddev.VisualStudio.SolutionCleaner.Models;
     using System;
     using System.ComponentModel.Design;
-    using System.Diagnostics;
     using System.IO;
-    using System.Reflection;
+    using System.Windows.Forms;
     using Task = System.Threading.Tasks.Task;
 
     /// <summary>
@@ -115,12 +114,15 @@
         /// <returns>OutputWindowTextWriter of type VSConstants.GUID_BuildOutputWindowPane.</returns>
         private static OutputWindowTextWriter GetOutputWindowTextWriter()
         {
+            ThreadHelper.ThrowIfNotOnUIThread();
+
             var outWindow = Package.GetGlobalService(typeof(SVsOutputWindow)) as IVsOutputWindow;
             var windowPaneGuid = VSConstants.GUID_BuildOutputWindowPane;
             outWindow.GetPane(ref windowPaneGuid, out var buildOutputPane);
+            
             buildOutputPane.Activate();
-            var outputWindowTextWriter = new OutputWindowTextWriter(buildOutputPane);
 
+            var outputWindowTextWriter = new OutputWindowTextWriter(buildOutputPane);
             return outputWindowTextWriter;
         }
 
@@ -129,54 +131,44 @@
             outputWindowTextWriter.WriteLine("Full clean started...");
 
             var solutionDirectory = Directory.GetCurrentDirectory();
-            var projectPaths = Directory.GetFiles(solutionDirectory, "*.csproj", SearchOption.AllDirectories);
-            var projectCount = 0;
-            var successCount = 0;
-            var failedCount = 0;
-            string currentProjectName = null;
+            var cleaningProcess = new CleaningProcess(solutionDirectory);
 
-            foreach (var projectPath in projectPaths)
+            foreach (var project in cleaningProcess.SolutionProjects)
             {
                 try
-                {
-                    projectCount++;
-                    var fileInfo = new System.IO.FileInfo(projectPath);
-                    currentProjectName = fileInfo.Name;
-                    outputWindowTextWriter.WriteLine($"{projectCount}> ------ Full clean started: Project: {currentProjectName} ------");
-                    var binDirectory = Path.Combine(fileInfo.DirectoryName, "bin");
-                    var objDirectory = Path.Combine(fileInfo.DirectoryName, "obj");
+                {                                        
+                    outputWindowTextWriter.WriteLine($"{project.Id}> ------ Full clean started: Project: {project.Name} ------");
 
-                    if (Directory.Exists(binDirectory))
-                    {
-                        Directory.Delete(binDirectory, true);
-                        outputWindowTextWriter.WriteLine($"{projectCount}> bin folder cleaned for project {currentProjectName}");
-                    }
-                    else
-                    {
-                        outputWindowTextWriter.WriteLine($"{projectCount}> No bin folder exists for project {currentProjectName}");
-                    }
+                    CleanDirectory(outputWindowTextWriter, project, "bin");
+                    CleanDirectory(outputWindowTextWriter, project, "obj");
 
-                    if (Directory.Exists(objDirectory))
-                    {
-                        Directory.Delete(objDirectory, true);
-                        outputWindowTextWriter.WriteLine($"{projectCount}> obj folder cleaned for project {currentProjectName}");
-                    }
-                    else
-                    {
-                        outputWindowTextWriter.WriteLine($"{projectCount}> No obj folder exists for project {currentProjectName}");
-                    }
-
-                    successCount++;
+                    cleaningProcess.SuccessCount++;
                 }
                 catch (Exception ex)
                 {
-                    failedCount++;
-                    outputWindowTextWriter.WriteLine($"ERROR: {projectCount}> Error while cleaning {currentProjectName}");
-                    outputWindowTextWriter.WriteLine($"ERROR: {projectCount}> {ex.Message}");
-                    outputWindowTextWriter.WriteLine($"ERROR: {projectCount}> {ex.StackTrace}");
+                    cleaningProcess.FailedCount++;
+
+                    outputWindowTextWriter.WriteLine($"ERROR: {project.Id}> Error while cleaning {project.Name}");
+                    outputWindowTextWriter.WriteLine($"ERROR: {project.Id}> {ex.Message}");
+                    outputWindowTextWriter.WriteLine($"ERROR: {project.Id}> {ex.StackTrace}");
                 }
 
-                outputWindowTextWriter.WriteLine($"========== Full clean: {successCount} succeeded, {failedCount} failed ==========");
+                outputWindowTextWriter.WriteLine($"========== Full clean: {cleaningProcess.SuccessCount} succeeded, {cleaningProcess.FailedCount} failed ==========");
+            }
+        }
+
+        private static void CleanDirectory(OutputWindowTextWriter outputWindowTextWriter, Project project, string folderToClean)
+        {
+            var pathToClean = Path.Combine(project.Path, folderToClean);
+
+            if (Directory.Exists(pathToClean))
+            {
+                Directory.Delete(pathToClean, true);
+                outputWindowTextWriter.WriteLine($"{project.Id}> {folderToClean} folder cleaned for project {project.Name}");
+            }
+            else
+            {
+                outputWindowTextWriter.WriteLine($"{project.Id}> No {folderToClean} folder exists for project {project.Name}");
             }
         }
     }
