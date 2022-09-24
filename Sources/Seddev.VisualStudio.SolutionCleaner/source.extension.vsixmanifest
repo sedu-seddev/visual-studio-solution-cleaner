@@ -2,7 +2,7 @@
 <PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011" xmlns:d="http://schemas.microsoft.com/developer/vsx-schema-design/2011">
     <Metadata>
         <Identity Id="Seddev.VisualStudio.SolutionCleaner.19016c33-72d4-4486-b411-982dbd78be8c" Version="1.0" Language="en-US" Publisher="Seddev" />
-        <DisplayName>Seddev Solution Cleaner</DisplayName>
+        <DisplayName>Solution Cleaner</DisplayName>
         <Description xml:space="preserve">Clean all "bin" and "obj" folders of all projects with one click.</Description>
         <MoreInfo>https://github.com/sedu-seddev/visual-studio-solution-cleaner</MoreInfo>
         <ReleaseNotes>Initial version.</ReleaseNotes>
